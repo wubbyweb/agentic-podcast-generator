@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 from ..base_agent import BaseAgent
 from database.connection import get_db_session
 from database.models import ResearchResult
+from services.search_api import SearchAPI
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ class WebResearcher(BaseAgent):
 
     def __init__(self):
         super().__init__("web_researcher", "research")
+        self.search_api = SearchAPI()
         self.research_tools = self._define_research_tools()
 
     def _define_research_tools(self) -> List[Dict[str, Any]]:
@@ -198,15 +200,15 @@ Create a comprehensive research plan that will gather high-quality, relevant inf
         return unique_results[:15]  # Limit to top 15 results
 
     async def _execute_web_search(self, query: str) -> List[Dict[str, Any]]:
-        """Execute a web search using the tool-calling interface."""
+        """Execute a web search using multiple search sources."""
 
-        # This is a simplified implementation
-        # In a real system, this would use actual search APIs or web scraping
+        # Use the SearchAPI to search multiple sources and combine results
+        search_results = await self.search_api.search_and_combine(query, num_results=10)
 
-        # For now, we'll simulate tool calling by directly calling a search function
-        # In production, this would use the OpenRouter tool-calling feature
-
-        search_results = await self._mock_web_search(query)
+        # Ensure each result has a 'content' field (fallback to snippet)
+        for result in search_results:
+            if 'content' not in result:
+                result['content'] = result.get('snippet', '')
 
         # Analyze each result for relevance and credibility
         analyzed_results = []
@@ -217,24 +219,6 @@ Create a comprehensive research plan that will gather high-quality, relevant inf
 
         return analyzed_results
 
-    async def _mock_web_search(self, query: str) -> List[Dict[str, Any]]:
-        """Mock web search implementation (replace with real search API)."""
-
-        # This is a placeholder - in production, you would integrate with:
-        # - Google Custom Search API
-        # - Bing Search API
-        # - DuckDuckGo API
-        # - Or use web scraping libraries
-
-        return [
-            {
-                "title": f"Latest Developments in {query}",
-                "url": f"https://example.com/{query.replace(' ', '-')}",
-                "snippet": f"Comprehensive overview of {query} with expert insights and analysis.",
-                "source": "example.com",
-                "content": f"Detailed content about {query}..."
-            }
-        ]
 
     async def _scrape_domain_pages(self, topic: str, domain: str) -> List[Dict[str, Any]]:
         """Scrape pages from a specific domain."""

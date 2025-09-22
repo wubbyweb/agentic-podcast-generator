@@ -36,7 +36,7 @@ class SystemConfig:
         self.database_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./agentic_system.db")
         self.log_level = os.getenv("LOG_LEVEL", "INFO")
         self.max_retries = int(os.getenv("MAX_RETRIES", "3"))
-        self.timeout_seconds = int(os.getenv("TIMEOUT_SECONDS", "30"))
+        self.timeout_seconds = int(os.getenv("TIMEOUT_SECONDS", "120"))
 
         # Optional API keys
         self.google_api_key = os.getenv("GOOGLE_API_KEY")

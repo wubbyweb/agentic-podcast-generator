@@ -174,7 +174,12 @@ Analyze this LinkedIn post for quality metrics."""
 
         try:
             analysis = json.loads(analysis_content)
-        except json.JSONDecodeError:
+            # Validate that scores are numbers
+            score_keys = ['engagement_potential', 'readability', 'seo_optimization', 'content_value', 'call_to_action_effectiveness', 'professional_tone', 'hashtag_integration']
+            for key in score_keys:
+                if key in analysis and not isinstance(analysis[key], (int, float)):
+                    analysis[key] = 0.7
+        except (json.JSONDecodeError, TypeError):
             # Fallback analysis
             analysis = self._fallback_quality_analysis(post_content)
 

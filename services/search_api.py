@@ -17,6 +17,14 @@ class SearchAPI:
         self.google_cse_id = config.google_cse_id
         self.bing_api_key = config.bing_api_key
 
+        # Skip placeholder values
+        if self.google_api_key and self.google_api_key.startswith("your_"):
+            self.google_api_key = None
+        if self.google_cse_id and self.google_cse_id.startswith("your_"):
+            self.google_cse_id = None
+        if self.bing_api_key and self.bing_api_key.startswith("your_"):
+            self.bing_api_key = None
+
     async def search_google(self, query: str, num_results: int = 10, **kwargs) -> List[Dict[str, Any]]:
         """Search using Google Custom Search API."""
         if not self.google_api_key or not self.google_cse_id:
