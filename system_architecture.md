@@ -1,8 +1,8 @@
-# Agentic System Architecture Plan
+# Agentic System Architecture
 
 ## System Overview
 
-This agentic system consists of a Master Agent orchestrating multiple specialized Sub-agents to process topics and generate content through a sequential pipeline with parallel processing capabilities.
+This agentic system consists of a Master Agent that coordinates research and content generation through a streamlined workflow: research-first approach followed by parallel content generation.
 
 ## System Architecture
 
@@ -10,30 +10,24 @@ This agentic system consists of a Master Agent orchestrating multiple specialize
 graph TD
     CLI[CLI Interface] --> MA[Master Agent]
     MA --> DB[(SQLite Database)]
-    MA --> |Analyze Topic| OA1[OpenRouter API - GPT-5]
-    
-    MA --> |Parallel Execution| WR[Web Researcher Sub-agent]
+
+    MA --> |Get Research| PR[Perplexity AI - sonar]
+    PR --> |Research Results| MA
+
     MA --> |Parallel Execution| KG[Keyword Generator Sub-agent]
-    
-    WR --> |Tool Calling| OA2[OpenRouter API - Tool Capable Model]
-    WR --> |Web Scraping| WS[Web Scraping Tools]
-    WR --> |Search| SA[Search APIs]
-    
-    KG --> |Generate Keywords| OA3[OpenRouter API - Gemini 2.5 Flash]
-    
-    WR --> |Research Results| MA
-    KG --> |Keywords/Hashtags| MA
-    
-    MA --> |Generate Post| PG[Post Generator Sub-agent]
-    PG --> |LinkedIn Post| OA4[OpenRouter API - Language Model]
-    PG --> |Post Content| MA
-    
-    MA --> |Create Dialog| VD[Voice Dialog Generator Sub-agent]
-    VD --> |Voice Script| OA5[OpenRouter API - Dialog Model]
-    VD --> |Dialog Script| MA
-    
+    MA --> |Parallel Execution| PG[Post Generator Sub-agent]
+    MA --> |Parallel Execution| VD[Voice Dialog Generator Sub-agent]
+
+    KG --> |Keywords/Hashtags| OA1[OpenRouter API - Gemini 2.0 Flash]
+    PG --> |LinkedIn Post| OA2[OpenRouter API - Grok-3]
+    VD --> |Voice Script| OA3[OpenRouter API - Grok-3]
+
+    KG --> |Results| MA
+    PG --> |Results| MA
+    VD --> |Results| MA
+
+    MA --> |Final Output| CLI
     MA --> |Log All Interactions| DB
-    WR --> |Log Research| DB
     KG --> |Log Keywords| DB
     PG --> |Log Posts| DB
     VD --> |Log Dialogs| DB
@@ -41,136 +35,103 @@ graph TD
 
 ## Component Specifications
 
-### 1. Master Agent
+### 1. CLI Interface (main.py)
+- **Purpose**: Command-line interface for user interaction
+- **Responsibilities**:
+  - Parse command-line arguments
+  - Call Perplexity AI for research
+  - Initialize Master Agent with research
+  - Display formatted results
+  - Handle error cases and logging
+
+### 2. Perplexity AI Research (sonar model)
+- **Purpose**: Perform comprehensive research on topics
+- **Capabilities**:
+  - Access to vast knowledge base
+  - Current and up-to-date information
+  - Structured research analysis
+  - Fact verification and insights
+- **Integration**: Called directly in `main.py` before Master Agent
+
+### 3. Master Agent
 - **Purpose**: Orchestrates the entire workflow and manages sub-agent lifecycle
 - **Responsibilities**:
-  - Accept topic input from CLI
-  - Analyze topic using GPT-5 via OpenRouter
-  - Spawn and coordinate sub-agents
-  - Manage parallel execution of Web Researcher and Keyword Generator
-  - Handle sequential execution of Post Generator and Voice Dialog Generator
-  - Log all agent handoffs and interactions
+  - Accept research input from Perplexity
+  - Initialize and coordinate sub-agents
+  - Manage parallel execution of Keyword, Post, and Voice generators
+  - Handle sequential processing and error recovery
+  - Log all agent interactions
   - Store results in SQLite database
 
-### 2. Web Researcher Sub-agent
-- **Purpose**: Research the given topic comprehensively
-- **Capabilities**:
-  - Web scraping using BeautifulSoup/Scrapy
-  - Search API integration (Google Custom Search, Bing, etc.)
-  - Content analysis and summarization
-  - Fact verification and source validation
-- **OpenRouter Model**: Tool-calling capable model (e.g., GPT-4, Claude-3)
-- **Tools Available**: Web scraping, search APIs, content extraction
+### 4. Keyword Generator Sub-agent
+- **Purpose**: Generate SEO-optimized keywords and hashtags
+- **Model**: Gemini 2.0 Flash (google/gemini-2.0-flash-001)
+- **Output**: Keywords, hashtags, and relevance scores
+- **Features**:
+  - Analyzes research content for relevant terms
+  - Categorizes keywords by search intent
+  - Calculates relevance scores
+  - Stores results in database
 
-### 3. Keyword Generator Sub-agent
-- **Purpose**: Generate relevant keywords and hashtags
-- **OpenRouter Model**: Gemini 2.5 Flash
-- **Output**: Structured keywords and hashtags for social media optimization
+### 5. Post Generator Sub-agent
+- **Purpose**: Create engaging LinkedIn posts
+- **Model**: Grok-3 Mini (xai/grok-3-mini)
+- **Style**: Casual, professional, and engaging
+- **Input**: Research results and keywords
+- **Features**:
+  - Incorporates research insights naturally
+  - Optimizes for LinkedIn engagement
+  - Maintains brand voice and tone
 
-### 4. LinkedIn Post Generator Sub-agent
-- **Purpose**: Create casual, engaging LinkedIn posts
-- **Input**: Research results + keywords
-- **OpenRouter Model**: Language model optimized for content creation
-- **Output**: Casual, professional LinkedIn post content
+### 6. Voice Dialog Generator Sub-agent
+- **Purpose**: Convert LinkedIn posts to conversational voice scripts
+- **Model**: Grok-3 Mini (xai/grok-3-mini)
+- **Output**: Natural, podcast-ready dialog
+- **Features**:
+  - Adds pacing, emphasis, and engagement cues
+  - Transforms written content to spoken format
+  - Includes music cues and transitions
 
-### 5. Voice Dialog Generator Sub-agent
-- **Purpose**: Convert LinkedIn post into conversational voice dialog
-- **OpenRouter Model**: Model capable of dialog generation
-- **Output**: Natural, conversational voice script format
-
-## Database Schema
-
-```sql
--- Agent Sessions
-CREATE TABLE sessions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    topic TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    status TEXT DEFAULT 'active'
-);
-
--- Agent Logs
-CREATE TABLE agent_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id INTEGER,
-    agent_name TEXT NOT NULL,
-    action TEXT NOT NULL,
-    input_data TEXT,
-    output_data TEXT,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    duration_ms INTEGER,
-    FOREIGN KEY (session_id) REFERENCES sessions (id)
-);
-
--- Research Results
-CREATE TABLE research_results (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id INTEGER,
-    source_url TEXT,
-    content TEXT,
-    relevance_score REAL,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (session_id) REFERENCES sessions (id)
-);
-
--- Keywords and Hashtags
-CREATE TABLE keywords (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id INTEGER,
-    keyword TEXT NOT NULL,
-    hashtag TEXT,
-    relevance_score REAL,
-    FOREIGN KEY (session_id) REFERENCES sessions (id)
-);
-
--- Generated Content
-CREATE TABLE generated_content (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id INTEGER,
-    content_type TEXT NOT NULL, -- 'linkedin_post', 'voice_dialog'
-    content TEXT NOT NULL,
-    metadata TEXT, -- JSON metadata
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (session_id) REFERENCES sessions (id)
-);
-```
+### 7. Database Layer (SQLite)
+- **Purpose**: Persistent storage and session management
+- **Tables**:
+  - `sessions`: Workflow instances with status tracking
+  - `agent_logs`: All agent actions and executions
+  - `keywords`: Generated keywords and hashtags
+  - `generated_content`: Posts and voice scripts
 
 ## Data Flow
 
 1. **User Input**: Topic provided via CLI
-2. **Master Analysis**: GPT-5 analyzes topic and creates execution plan
-3. **Parallel Processing**:
-   - Web Researcher: Gathers comprehensive research data
-   - Keyword Generator: Creates relevant keywords/hashtags
-4. **Sequential Processing**:
-   - Post Generator: Creates LinkedIn post using research + keywords
-   - Voice Dialog Generator: Converts post to conversational format
-5. **Logging**: All interactions logged to console and database
+2. **Research Phase**: Perplexity AI performs comprehensive research
+3. **Master Coordination**: Research passed to Master Agent
+4. **Parallel Generation**:
+   - Keyword Generator creates keywords/hashtags
+   - Post Generator creates LinkedIn content
+   - Voice Dialog Generator creates podcast script
+5. **Result Aggregation**: Master Agent collects all results
+6. **Output & Logging**: Formatted display and database storage
 
 ## Technology Stack
 
 - **Language**: Python 3.9+
 - **Database**: SQLite3 with SQLAlchemy ORM
 - **HTTP Client**: aiohttp for async API calls
-- **Web Scraping**: BeautifulSoup4, Scrapy (optional)
-- **CLI**: Click or argparse
-- **Logging**: Python logging module with custom formatters
-- **Configuration**: Python-dotenv for environment variables
-- **Testing**: pytest with asyncio support
+- **CLI**: Click framework
+- **Configuration**: python-dotenv
+- **Logging**: Python logging with custom formatters
 
 ## Key Dependencies
 
 ```python
 # requirements.txt
-aiohttp>=3.8.0
-sqlalchemy>=2.0.0
-beautifulsoup4>=4.11.0
+aiohttp>=3.9.0
 click>=8.1.0
 python-dotenv>=1.0.0
-pytest>=7.0.0
+sqlalchemy>=2.0.0
+aiosqlite>=0.19.0
+pytest>=7.4.0
 pytest-asyncio>=0.21.0
-requests>=2.28.0
-scrapy>=2.7.0  # Optional for advanced scraping
 ```
 
 ## Agent Communication Protocol
@@ -179,32 +140,31 @@ scrapy>=2.7.0  # Optional for advanced scraping
 ```python
 {
     "from_agent": "master",
-    "to_agent": "web_researcher",
-    "action": "research_topic",
+    "to_agent": "keyword_generator",
+    "action": "generate_keywords",
     "payload": {
         "topic": "AI in healthcare",
-        "analysis": "...",
-        "requirements": ["recent_developments", "key_players", "challenges"]
+        "research_response": "...",
+        "requirements": ["seo_keywords", "hashtags", "relevance_scores"]
     },
-    "timestamp": "2024-01-15T10:30:00Z",
-    "session_id": "uuid-string"
+    "timestamp": "2024-01-01T00:00:00Z",
+    "session_id": 123
 }
 ```
 
 ### Response Format
 ```python
 {
-    "from_agent": "web_researcher",
+    "from_agent": "keyword_generator",
     "to_agent": "master",
-    "action": "research_complete",
+    "action": "keywords_generated",
     "payload": {
-        "research_summary": "...",
-        "sources": [...],
-        "key_findings": [...],
-        "confidence_score": 0.85
+        "keywords": ["ai healthcare", "medical ai", ...],
+        "hashtags": ["#AIHealthcare", "#MedicalAI", ...],
+        "relevance_scores": {"ai healthcare": 0.95, ...}
     },
-    "timestamp": "2024-01-15T10:35:00Z",
-    "session_id": "uuid-string"
+    "timestamp": "2024-01-01T00:00:15Z",
+    "session_id": 123
 }
 ```
 
@@ -213,55 +173,48 @@ scrapy>=2.7.0  # Optional for advanced scraping
 1. **Retry Mechanisms**: Exponential backoff for API failures
 2. **Fallback Models**: Alternative OpenRouter models if primary fails
 3. **Graceful Degradation**: Continue with partial results if sub-agent fails
-4. **Comprehensive Logging**: All errors logged with context
-5. **Recovery Procedures**: Ability to resume from last successful step
+4. **Comprehensive Logging**: All errors logged with context and session info
+5. **Session Recovery**: Ability to resume from last successful step
 
 ## Configuration Management
 
 ```python
-# config.py
-class Config:
-    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///agentic_system.db")
-    
-    # Model configurations
-    MASTER_MODEL = "openai/gpt-5"
-    RESEARCH_MODEL = "anthropic/claude-3-opus"
-    KEYWORD_MODEL = "google/gemini-2.5-flash"
-    POST_MODEL = "openai/gpt-4"
-    DIALOG_MODEL = "anthropic/claude-3-sonnet"
-    
-    # API limits and timeouts
-    MAX_RETRIES = 3
-    TIMEOUT_SECONDS = 30
-    RATE_LIMIT_REQUESTS_PER_MINUTE = 60
+# config/settings.py
+class SystemConfig:
+    # Research models
+    models["master"] = ModelConfig(name="sonar")  # Perplexity AI
+    models["research"] = ModelConfig(name="sonar")  # Perplexity AI
+
+    # Content generation models
+    models["keyword"] = ModelConfig(name="google/gemini-2.0-flash-001")
+    models["post"] = ModelConfig(name="xai/grok-3-mini")
+    models["dialog"] = ModelConfig(name="xai/grok-3-mini")
 ```
 
 ## Implementation Phases
 
-### Phase 1: Core Infrastructure
+### Phase 1: Core Infrastructure ✅
 - Project setup and dependencies
 - Database schema and connection
 - OpenRouter API client
 - Base Agent class
 
-### Phase 2: Master Agent
+### Phase 2: Research Integration ✅
+- Perplexity AI integration
 - CLI interface
-- Topic analysis
-- Agent orchestration
-- Logging system
+- Basic research workflow
 
-### Phase 3: Sub-agents Implementation
-- Web Researcher with tool calling
-- Keyword Generator
-- Post Generator
-- Voice Dialog Generator
+### Phase 3: Content Generation Agents ✅
+- Keyword Generator (Gemini 2.0 Flash)
+- Post Generator (Grok-3 Mini)
+- Voice Dialog Generator (Grok-3 Mini)
+- Parallel execution framework
 
-### Phase 4: Integration and Testing
-- End-to-end workflow testing
-- Error handling refinement
+### Phase 4: Integration and Refinement ✅
+- Master Agent orchestration
+- Session management
+- Error handling and logging
 - Performance optimization
-- Documentation
 
 ## Success Metrics
 
@@ -269,6 +222,19 @@ class Config:
 2. **Performance**: End-to-end execution within reasonable time limits
 3. **Reliability**: Graceful handling of API failures and errors
 4. **Usability**: Clear CLI interface and comprehensive logging
-5. **Maintainability**: Well-structured, documented code
+5. **Maintainability**: Well-structured, documented code with accurate configuration
+
+## Important Notes
+
+### Model Usage Clarification
+- **Research**: `perplexity/sonar` (Perplexity AI) - NOT GPT-5
+- **Keywords**: `google/gemini-2.0-flash-001` - NOT Gemini 2.5 Flash
+- **Posts & Voice**: `xai/grok-3-mini` - NOT GPT-4 or Claude-3 Sonnet
+
+### GPT-5 References
+**GPT-5 is NOT used anywhere in the actual running application.** Despite some outdated references in documentation and tests, the system uses the models listed above.
+
+### Web Research Status
+The system includes a `WebResearcher` agent with tool-calling capabilities, but it is **not used** in the current workflow. The system currently relies on Perplexity AI for research instead.
 
 This architecture provides a robust foundation for building a sophisticated agentic system with clear separation of concerns, comprehensive logging, and scalable design patterns.

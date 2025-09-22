@@ -4,338 +4,286 @@
 
 ```
 agentic-podcast-generator/
-├── README.md
-├── requirements.txt
-├── setup.py
-├── .env.example
-├── .gitignore
-├── main.py                     # CLI entry point
+├── README.md                          # Project overview and usage
+├── requirements.txt                   # Python dependencies
+├── pyproject.toml                     # Project configuration
+├── .env.example                       # Environment variables template
+├── .gitignore                         # Git ignore rules
+├── main.py                            # CLI entry point
+├── agentic_podcast_generator_tutorial.ipynb  # Interactive tutorial
+├── sequence.md                        # Workflow diagram
+├── system_architecture.md            # Architecture documentation
+├── technical_specifications.md       # Technical details
+├── test_system.py                     # System testing script
 ├── config/
 │   ├── __init__.py
-│   ├── settings.py             # Configuration management
-│   └── models.yaml             # OpenRouter model configurations
+│   └── settings.py                   # Configuration management
 ├── database/
 │   ├── __init__.py
-│   ├── models.py               # SQLAlchemy models
-│   ├── connection.py           # Database connection and setup
-│   └── migrations/             # Database migrations
+│   ├── models.py                     # SQLAlchemy models
+│   └── connection.py                 # Database setup
 ├── agents/
 │   ├── __init__.py
-│   ├── base_agent.py           # Base Agent class
-│   ├── master_agent.py         # Master Agent implementation
+│   ├── base_agent.py                 # Base Agent class
+│   ├── master_agent.py               # Master Agent implementation
 │   └── sub_agents/
 │       ├── __init__.py
-│       ├── web_researcher.py   # Web research capabilities
-│       ├── keyword_generator.py# Keyword/hashtag generation
-│       ├── post_generator.py   # LinkedIn post creation
-│       └── voice_dialog.py     # Voice dialog generation
+│       ├── web_researcher.py         # Web research (legacy/not used)
+│       ├── keyword_generator.py      # Keyword/hashtag generation
+│       ├── post_generator.py         # LinkedIn post creation
+│       └── voice_dialog.py           # Voice dialog generation
 ├── services/
 │   ├── __init__.py
-│   ├── openrouter_client.py    # OpenRouter API client
-│   ├── web_scraper.py          # Web scraping utilities
-│   ├── search_api.py           # Search API integrations
-│   └── logger.py               # Custom logging service
+│   ├── openrouter_client.py          # OpenRouter API client
+│   ├── search_api.py                 # Search API integrations (legacy)
+│   ├── web_scraper.py                # Web scraping (legacy)
+│   └── logger.py                     # Logging service
 ├── utils/
 │   ├── __init__.py
-│   ├── communication.py        # Agent communication protocol
-│   ├── retry.py                # Retry mechanisms
-│   └── validators.py           # Data validation utilities
-├── tests/
-│   ├── __init__.py
-│   ├── test_agents.py
-│   ├── test_services.py
-│   └── fixtures/
-└── docs/
-    ├── api_reference.md
-    ├── usage_examples.md
-    └── troubleshooting.md
+│   ├── communication.py              # Agent communication protocol
+│   ├── retry.py                      # Retry mechanisms
+│   └── validators.py                 # Data validation utilities
+└── tests/
+    ├── __init__.py
+    ├── conftest.py                   # Test configuration
+    ├── test_agents.py                # Agent tests
+    ├── test_basic.py                 # Basic functionality tests
+    ├── test_config.py                # Configuration tests
+    ├── test_database.py              # Database tests
+    ├── test_main.py                  # Main CLI tests
+    ├── test_services.py              # Service tests
+    └── test_utils.py                 # Utility tests
 ```
 
-## Core Implementation Files
+## Actual Implementation Overview
 
-### 1. main.py - CLI Entry Point
+### Current Workflow (As Implemented)
+
+1. **CLI Entry** (`main.py`)
+   - Parse command line arguments
+   - Call Perplexity AI (sonar model) for research
+   - Initialize Master Agent with research results
+   - Display formatted output
+
+2. **Research Phase** (Sequential)
+   - Perplexity AI performs comprehensive research
+   - Returns detailed analysis and insights
+
+3. **Content Generation** (Parallel)
+   - Master Agent coordinates 3 sub-agents simultaneously:
+     - **Keyword Generator** (Gemini 2.0 Flash)
+     - **Post Generator** (Grok-3 Mini)
+     - **Voice Dialog Generator** (Grok-3 Mini)
+
+4. **Output & Logging**
+   - Formatted results displayed
+   - All interactions logged to SQLite database
+
+### Key Implementation Details
+
+#### Models Actually Used
+- **Research**: `perplexity/sonar` (Perplexity AI) - NOT GPT-5
+- **Keywords**: `google/gemini-2.0-flash-001` - NOT Gemini 2.5 Flash
+- **Posts**: `xai/grok-3-mini` - NOT GPT-4
+- **Voice**: `xai/grok-3-mini` - NOT Claude-3 Sonnet
+
+#### Important Notes
+- **GPT-5 is NOT used** anywhere in the running application
+- **Web Researcher agent exists** but is not used in main workflow
+- **Perplexity AI integration** is done directly in `main.py`, not through an agent
+
+## Component Details
+
+### Core Components
+
+#### main.py - CLI Entry Point
 ```python
-#!/usr/bin/env python3
-"""
-Agentic System CLI Entry Point
-Handles user input and initiates the Master Agent workflow
-"""
+# Actual implementation structure
+async def async_main(topic, verbose, session_id, output_format):
+    # 1. Get research from Perplexity AI
+    research_response = await get_perplexity_research(topic)
 
-import asyncio
-import click
-from agents.master_agent import MasterAgent
-from config.settings import Config
-from database.connection import init_database
-from services.logger import setup_logging
+    # 2. Process with Master Agent
+    async with MasterAgent() as master:
+        result = await master.process_topic_with_research(
+            topic, research_response, session_id=session_id
+        )
 
-@click.command()
-@click.argument('topic', required=True)
-@click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging')
-@click.option('--session-id', help='Resume existing session')
-async def main(topic: str, verbose: bool, session_id: str = None):
-    """Process a topic through the agentic system pipeline."""
-    
-    # Initialize logging
-    setup_logging(verbose=verbose)
-    
-    # Initialize database
-    await init_database()
-    
-    # Create and run Master Agent
-    master = MasterAgent(config=Config())
-    result = await master.process_topic(topic, session_id=session_id)
-    
-    click.echo(f"Processing complete. Session ID: {result.session_id}")
-    click.echo(f"LinkedIn Post: {result.linkedin_post}")
-    click.echo(f"Voice Dialog: {result.voice_dialog}")
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    # 3. Display results
+    display_results(result)
 ```
 
-### 2. agents/base_agent.py - Base Agent Class
+#### Master Agent (agents/master_agent.py)
 ```python
-from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
-import uuid
-from datetime import datetime
-from services.logger import get_agent_logger
-from database.models import AgentLog, Session
-
-class BaseAgent(ABC):
-    """Base class for all agents in the system."""
-    
-    def __init__(self, name: str, config: Dict[str, Any]):
-        self.name = name
-        self.config = config
-        self.logger = get_agent_logger(name)
-        self.session_id: Optional[str] = None
-        
-    async def log_action(self, action: str, input_data: Any, 
-                        output_data: Any, duration_ms: int):
-        """Log agent action to database and console."""
-        # Implementation for logging
-        pass
-    
-    @abstractmethod
-    async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute the agent's primary function."""
-        pass
-    
-    async def handoff_to(self, target_agent: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle communication with other agents."""
-        # Implementation for agent communication
-        pass
-```
-
-### 3. agents/master_agent.py - Master Agent
-```python
-import asyncio
-from typing import Dict, Any, List
-from agents.base_agent import BaseAgent
-from agents.sub_agents.web_researcher import WebResearcher
-from agents.sub_agents.keyword_generator import KeywordGenerator
-from agents.sub_agents.post_generator import PostGenerator
-from agents.sub_agents.voice_dialog import VoiceDialogGenerator
-from services.openrouter_client import OpenRouterClient
-
 class MasterAgent(BaseAgent):
-    """Master Agent that orchestrates all sub-agents."""
-    
-    def __init__(self, config):
-        super().__init__("master", config)
-        self.openrouter = OpenRouterClient(config.OPENROUTER_API_KEY)
-        
-    async def process_topic(self, topic: str, session_id: str = None) -> Dict[str, Any]:
-        """Main workflow orchestration."""
-        
-        # 1. Analyze topic with GPT-5
-        analysis = await self.analyze_topic(topic)
-        
-        # 2. Create sub-agents
-        web_researcher = WebResearcher(self.config)
-        keyword_generator = KeywordGenerator(self.config)
-        
-        # 3. Execute parallel tasks
-        research_task = web_researcher.execute({"topic": topic, "analysis": analysis})
-        keyword_task = keyword_generator.execute({"topic": topic, "analysis": analysis})
-        
-        research_results, keywords = await asyncio.gather(research_task, keyword_task)
-        
-        # 4. Generate LinkedIn post
-        post_generator = PostGenerator(self.config)
-        post_result = await post_generator.execute({
-            "topic": topic,
-            "research": research_results,
-            "keywords": keywords
-        })
-        
-        # 5. Generate voice dialog
-        voice_generator = VoiceDialogGenerator(self.config)
-        voice_result = await voice_generator.execute({
-            "linkedin_post": post_result["content"]
-        })
-        
+    async def process_topic_with_research(self, topic, research_response, session_id=None):
+        # 1. Create session
+        self.session_id = await create_session_record(topic)
+
+        # 2. Initialize sub-agents
+        await self.initialize_all_agents()
+
+        # 3. Run parallel execution
+        post_task = self.sub_agents['post_generator'].execute_with_logging(post_input)
+        voice_task = self.sub_agents['voice_dialog'].execute_with_logging(voice_input)
+        keyword_task = self.sub_agents['keyword_generator'].execute_with_logging(keyword_input)
+
+        # 4. Gather results
+        results = await asyncio.gather(post_task, voice_task, keyword_task, return_exceptions=True)
+
+        # 5. Return formatted results
         return {
             "session_id": self.session_id,
-            "linkedin_post": post_result["content"],
-            "voice_dialog": voice_result["dialog"],
-            "keywords": keywords["keywords"],
-            "research_summary": research_results["summary"]
+            "topic": topic,
+            "linkedin_post": results[0]["content"] if not isinstance(results[0], Exception) else "",
+            "voice_dialog": results[1]["dialog"] if not isinstance(results[1], Exception) else "",
+            "keywords": results[2]["keywords"] if not isinstance(results[2], Exception) else [],
+            "hashtags": results[2]["hashtags"] if not isinstance(results[2], Exception) else [],
+            "research_summary": research_response[:500]
         }
-    
-    async def analyze_topic(self, topic: str) -> Dict[str, Any]:
-        """Analyze topic using GPT-5."""
-        # Implementation for topic analysis
-        pass
 ```
 
-### 4. services/openrouter_client.py - OpenRouter API Client
-```python
-import aiohttp
-import json
-from typing import Dict, Any, List, Optional
-from utils.retry import retry_with_backoff
+### Sub-Agent Implementations
 
-class OpenRouterClient:
-    """Client for OpenRouter API with retry logic and model management."""
-    
-    def __init__(self, api_key: str):
-        self.api_key = api_key
-        self.base_url = "https://openrouter.ai/api/v1"
-        self.session: Optional[aiohttp.ClientSession] = None
-    
-    async def __aenter__(self):
-        self.session = aiohttp.ClientSession()
-        return self
-    
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self.session:
-            await self.session.close()
-    
-    @retry_with_backoff(max_retries=3)
-    async def chat_completion(self, model: str, messages: List[Dict], 
-                             tools: Optional[List[Dict]] = None) -> Dict[str, Any]:
-        """Send chat completion request to OpenRouter."""
-        
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
+#### Keyword Generator (agents/sub_agents/keyword_generator.py)
+- **Model**: `google/gemini-2.0-flash-001`
+- **Purpose**: Generate SEO keywords and hashtags
+- **Key Features**:
+  - Analyzes research content
+  - Categorizes keywords by intent
+  - Calculates relevance scores
+  - Cleans and validates output
+
+#### Post Generator (agents/sub_agents/post_generator.py)
+- **Model**: `xai/grok-3-mini`
+- **Purpose**: Create LinkedIn posts
+- **Input**: Topic, research, keywords
+- **Output**: Formatted professional content
+
+#### Voice Dialog Generator (agents/sub_agents/voice_dialog.py)
+- **Model**: `xai/grok-3-mini`
+- **Purpose**: Convert posts to podcast scripts
+- **Features**: Natural conversation patterns, pacing cues
+
+#### Web Researcher (agents/sub_agents/web_researcher.py) - LEGACY
+- **Status**: Implemented but NOT USED in current workflow
+- **Purpose**: Web research with tool-calling capabilities
+- **Note**: System currently uses Perplexity AI instead
+
+### Configuration System (config/settings.py)
+
+```python
+class SystemConfig:
+    def setup_models(self):
+        # Actual models used in production
+        self.models = {
+            "master": ModelConfig(name="sonar"),  # Perplexity AI
+            "research": ModelConfig(name="sonar"),  # Perplexity AI
+            "keyword": ModelConfig(name="google/gemini-2.0-flash-001"),  # Gemini 2.0
+            "post": ModelConfig(name="xai/grok-3-mini"),  # Grok-3 Mini
+            "dialog": ModelConfig(name="xai/grok-3-mini")  # Grok-3 Mini
         }
-        
-        payload = {
-            "model": model,
-            "messages": messages
-        }
-        
-        if tools:
-            payload["tools"] = tools
-            payload["tool_choice"] = "auto"
-        
-        async with self.session.post(
-            f"{self.base_url}/chat/completions", 
-            headers=headers, 
-            json=payload
-        ) as response:
-            response.raise_for_status()
-            return await response.json()
 ```
 
-### 5. database/models.py - SQLAlchemy Models
+### Database Models (database/models.py)
+
 ```python
-from sqlalchemy import Column, Integer, String, Text, DateTime, Float, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
-from datetime import datetime
-
-Base = declarative_base()
-
+# Key tables
 class Session(Base):
-    __tablename__ = 'sessions'
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    topic = Column(Text, nullable=False)
+    __tablename__ = "sessions"
+    id = Column(Integer, primary_key=True)
+    topic = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
-    status = Column(String(50), default='active')
-    
-    # Relationships
-    agent_logs = relationship("AgentLog", back_populates="session")
-    research_results = relationship("ResearchResult", back_populates="session")
-    keywords = relationship("Keyword", back_populates="session")
-    generated_content = relationship("GeneratedContent", back_populates="session")
+    status = Column(String, default="active")
 
 class AgentLog(Base):
-    __tablename__ = 'agent_logs'
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    session_id = Column(Integer, ForeignKey('sessions.id'))
-    agent_name = Column(String(100), nullable=False)
-    action = Column(String(200), nullable=False)
+    __tablename__ = "agent_logs"
+    id = Column(Integer, primary_key=True)
+    session_id = Column(Integer, ForeignKey("sessions.id"))
+    agent_name = Column(String, nullable=False)
+    action = Column(String, nullable=False)
     input_data = Column(Text)
     output_data = Column(Text)
     timestamp = Column(DateTime, default=datetime.utcnow)
     duration_ms = Column(Integer)
-    
-    # Relationships
-    session = relationship("Session", back_populates="agent_logs")
 
-# Additional model classes...
+class Keyword(Base):
+    __tablename__ = "keywords"
+    id = Column(Integer, primary_key=True)
+    session_id = Column(Integer, ForeignKey("sessions.id"))
+    keyword = Column(String, nullable=False)
+    keyword_type = Column(String)  # "keyword" or "hashtag"
+    relevance_score = Column(Float)
+    category = Column(String)
+
+class GeneratedContent(Base):
+    __tablename__ = "generated_content"
+    id = Column(Integer, primary_key=True)
+    session_id = Column(Integer, ForeignKey("sessions.id"))
+    content_type = Column(String, nullable=False)  # "linkedin_post" or "voice_dialog"
+    content = Column(Text, nullable=False)
+    metadata = Column(Text)  # JSON metadata
+    created_at = Column(DateTime, default=datetime.utcnow)
 ```
 
-## Implementation Workflow
+## Development Workflow
 
-### Phase 1: Foundation (Days 1-2)
-1. Set up project structure and virtual environment
-2. Install dependencies and configure development environment
-3. Implement database models and connection handling
-4. Create basic configuration management
-5. Set up logging infrastructure
+### Running the System
+```bash
+# Basic usage
+python main.py "Artificial Intelligence in Healthcare"
 
-### Phase 2: Core Services (Days 3-4)
-1. Implement OpenRouter API client with retry logic
-2. Create base agent class with common functionality
-3. Build agent communication protocol
-4. Implement web scraping and search API services
+# With verbose logging
+python main.py "Machine Learning Trends" --verbose
 
-### Phase 3: Agent Implementation (Days 5-7)
-1. Implement Master Agent with orchestration logic
-2. Create Web Researcher sub-agent with tool calling
-3. Build Keyword Generator using Gemini 2.5 Flash
-4. Implement Post Generator for LinkedIn content
-5. Create Voice Dialog Generator
+# Resume session
+python main.py "AI Ethics" --session-id 123
 
-### Phase 4: Integration & Testing (Days 8-9)
-1. Integrate all components and test end-to-end workflow
-2. Implement comprehensive error handling
-3. Add CLI interface and user experience improvements
-4. Performance testing and optimization
+# JSON output
+python main.py "Blockchain Technology" --output-format json
+```
 
-### Phase 5: Documentation & Deployment (Day 10)
-1. Write comprehensive documentation
-2. Create usage examples and troubleshooting guides
-3. Package for distribution
-4. Final testing and quality assurance
+### Testing
+```bash
+# Run all tests
+pytest tests/
 
-## Key Implementation Considerations
+# Run specific test file
+pytest tests/test_agents.py -v
 
-### Concurrency Management
-- Use asyncio for parallel execution of Web Researcher and Keyword Generator
-- Implement proper async/await patterns throughout
-- Handle rate limiting for OpenRouter API calls
+# Run with coverage
+pytest --cov=agents --cov-report=html
+```
 
-### Error Handling
-- Implement retry mechanisms with exponential backoff
-- Graceful degradation when sub-agents fail
-- Comprehensive error logging and recovery procedures
+### Code Quality
+```bash
+# Format code
+black .
 
-### Memory Management
-- Efficient database connection pooling
-- Proper cleanup of web scraping resources
-- Memory-conscious handling of large research datasets
+# Lint code
+flake8 .
 
-### Security
-- Secure API key management
-- Input validation and sanitization
-- Rate limiting and abuse prevention
+# Type checking
+mypy .
+```
 
-This structure provides a solid foundation for implementing the complete agentic system with clear separation of concerns and scalable architecture.
+## Important Clarifications
+
+### GPT-5 References (OUTDATED)
+**GPT-5 is NOT used in the actual application.** References exist in:
+- Some documentation (being updated)
+- Test files (expecting old defaults)
+- Example code (speculative)
+
+### Web Research Status
+- **WebResearcher agent**: Exists but not used
+- **Current research**: Direct Perplexity AI integration
+- **Future potential**: Web research capabilities available if needed
+
+### Model Accuracy
+Always verify actual models by checking:
+- `config/settings.py` for current configurations
+- `main.py` for research implementation
+- Agent source code for model usage
+
+This documentation reflects the actual implemented system as of the current codebase.

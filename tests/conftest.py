@@ -156,10 +156,10 @@ def mock_config():
     mock_config.max_retries = 3
     mock_config.timeout_seconds = 30
     mock_config.models = {
-        "master": Mock(name="openai/gpt-5", max_tokens=4000, temperature=0.7),
-        "research": Mock(name="anthropic/claude-3-opus", max_tokens=8000, temperature=0.3),
-        "keyword": Mock(name="google/gemini-2.5-flash", max_tokens=2000, temperature=0.5),
-        "post": Mock(name="openai/gpt-4", max_tokens=1000, temperature=0.8),
-        "dialog": Mock(name="anthropic/claude-3-sonnet", max_tokens=3000, temperature=0.9)
+        "master": Mock(name="perplexity/sonar", max_tokens=4000, temperature=0.7),
+        "research": Mock(name="perplexity/sonar", max_tokens=4000, temperature=0.3),
+        "keyword": Mock(name="google/gemini-2.0-flash-001", max_tokens=2000, temperature=0.5),
+        "post": Mock(name="xai/grok-3-mini", max_tokens=1000, temperature=0.8),
+        "dialog": Mock(name="xai/grok-3-mini", max_tokens=3000, temperature=0.9)
     }
     return mock_config

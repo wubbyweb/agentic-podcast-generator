@@ -14,7 +14,7 @@ class PostGenerator(BaseAgent):
     """LinkedIn Post Generator agent for creating engaging professional content."""
 
     def __init__(self):
-        super().__init__("post_generator", "post")
+        super().__init__("post_generator", "post_generator")
 
     async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Generate a LinkedIn post based on research response."""

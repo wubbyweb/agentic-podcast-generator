@@ -15,7 +15,7 @@ class VoiceDialogGenerator(BaseAgent):
     """Voice Dialog Generator agent for creating conversational voice scripts."""
 
     def __init__(self):
-        super().__init__("voice_dialog", "dialog")
+        super().__init__("voice_dialog", "voice_dialog")
 
     async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Generate a voice dialog script from research response."""

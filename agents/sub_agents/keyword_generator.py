@@ -12,10 +12,10 @@ from database.models import Keyword
 logger = logging.getLogger(__name__)
 
 class KeywordGenerator(BaseAgent):
-    """Keyword Generator agent using Gemini 2.5 Flash for SEO-optimized content."""
+    """Keyword Generator agent using Gemini 2.0 Flash for SEO-optimized content."""
 
     def __init__(self):
-        super().__init__("keyword_generator", "keyword")
+        super().__init__("keyword_generator", "keyword_generator")
 
     async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Generate keywords and hashtags for the given topic using research response."""

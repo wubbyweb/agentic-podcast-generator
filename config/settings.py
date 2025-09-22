@@ -38,90 +38,69 @@ class SystemConfig:
         self.max_retries = int(os.getenv("MAX_RETRIES", "3"))
         self.timeout_seconds = int(os.getenv("TIMEOUT_SECONDS", "120"))
 
-        # Optional API keys
+        # Optional API keys (not currently used)
         self.google_api_key = os.getenv("GOOGLE_API_KEY")
         self.google_cse_id = os.getenv("GOOGLE_CSE_ID")
         self.bing_api_key = os.getenv("BING_API_KEY")
-        self.perplexity_api_key = os.getenv("PERPLEXITY_API_KEY")
 
-        # Web scraping config
+        # Web scraping config (legacy - not currently used)
         self.user_agent = os.getenv("USER_AGENT", "AgenticSystem/1.0.0")
         self.max_concurrent_requests = int(os.getenv("MAX_CONCURRENT_REQUESTS", "10"))
         self.request_delay = float(os.getenv("REQUEST_DELAY", "1.0"))
 
     def setup_models(self):
-        """Configure OpenRouter models"""
+        """Configure OpenRouter models - matches actual usage in the system"""
         self.models = {
             "master": ModelConfig(
-                name=os.getenv("MASTER_MODEL", "sonar"),  # Perplexity sonar for research
+                name=os.getenv("MASTER_MODEL", "perplexity/sonar"),  # Perplexity AI for research
                 max_tokens=4000,
-                temperature=0.7
+                temperature=0.3  # Lower temperature for research accuracy
             ),
             "research": ModelConfig(
-                name=os.getenv("RESEARCH_MODEL", "sonar"),  # Perplexity sonar for research
+                name=os.getenv("RESEARCH_MODEL", "perplexity/sonar"),  # Perplexity AI for research
                 max_tokens=8000,
                 temperature=0.3
             ),
             "keyword": ModelConfig(
-                name=os.getenv("KEYWORD_MODEL", "google/gemini-2.0-flash-001"),
+                name=os.getenv("KEYWORD_MODEL", "google/gemini-2.0-flash-001"),  # Actual model used
                 max_tokens=2000,
                 temperature=0.5
             ),
             "post": ModelConfig(
-                name=os.getenv("POST_MODEL", "xai/grok-3-mini"),
+                name=os.getenv("POST_MODEL", "xai/grok-3-mini"),  # Actual model used
                 max_tokens=1000,
-                temperature=0.8
+                temperature=0.8  # Higher temperature for creative content
             ),
             "dialog": ModelConfig(
-                name=os.getenv("DIALOG_MODEL", "xai/grok-3-mini"),
+                name=os.getenv("DIALOG_MODEL", "xai/grok-3-mini"),  # Actual model used
                 max_tokens=3000,
-                temperature=0.9
+                temperature=0.9  # Higher temperature for conversational content
             )
         }
 
     def setup_agents(self):
-        """Configure agent-specific settings"""
+        """Configure agent-specific settings - matches actual system architecture"""
         self.agents = {
             "master": AgentConfig(
                 name="master",
                 model=self.models["master"],
                 max_retries=self.max_retries
             ),
-            "research": AgentConfig(
-                name="research",
-                model=self.models["research"],
-                max_retries=self.max_retries,
-                tools=["web_search", "scrape_webpage", "analyze_content"]
-            ),
+            # Note: Web researcher agent exists but is not used in current workflow
             "web_researcher": AgentConfig(
                 name="web_researcher",
                 model=self.models["research"],
                 max_retries=self.max_retries,
                 tools=["web_search", "scrape_webpage", "analyze_content"]
             ),
-            "keyword": AgentConfig(
-                name="keyword",
-                model=self.models["keyword"],
-                max_retries=self.max_retries
-            ),
             "keyword_generator": AgentConfig(
                 name="keyword_generator",
                 model=self.models["keyword"],
                 max_retries=self.max_retries
             ),
-            "post": AgentConfig(
-                name="post",
-                model=self.models["post"],
-                max_retries=self.max_retries
-            ),
             "post_generator": AgentConfig(
                 name="post_generator",
                 model=self.models["post"],
-                max_retries=self.max_retries
-            ),
-            "dialog": AgentConfig(
-                name="dialog",
-                model=self.models["dialog"],
                 max_retries=self.max_retries
             ),
             "voice_dialog": AgentConfig(

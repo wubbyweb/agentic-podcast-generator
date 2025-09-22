@@ -1,23 +1,23 @@
 # 🤖 Agentic Podcast Generator
 
-An intelligent multi-agent system that processes topics through a coordinated workflow of specialized agents to generate LinkedIn posts and voice dialog scripts.
+An intelligent multi-agent system that processes topics through a coordinated workflow to generate LinkedIn posts and voice dialog scripts using AI research and content generation.
 
 ## 🚀 Features
 
-- **Master Agent**: Orchestrates the entire workflow using GPT-5 analysis
-- **Web Researcher**: Comprehensive research using tool-calling capabilities
-- **Keyword Generator**: Generates relevant keywords and hashtags using Gemini 2.5 Flash
-- **Post Generator**: Creates engaging LinkedIn posts in casual language
-- **Voice Dialog Generator**: Converts posts into conversational voice scripts
+- **Research-First Approach**: Uses Perplexity AI (sonar model) for comprehensive topic research
+- **Master Agent**: Orchestrates the entire workflow and manages sub-agent execution
+- **Keyword Generator**: Generates SEO-optimized keywords and hashtags using Gemini 2.0 Flash
+- **Post Generator**: Creates engaging LinkedIn posts in casual language using Grok-3
+- **Voice Dialog Generator**: Converts posts into conversational voice scripts using Grok-3
 - **SQLite Database**: Persistent storage of agent memory and session logs
-- **Parallel Processing**: Research and keyword generation run simultaneously
+- **Parallel Processing**: Keyword, post, and voice generation run simultaneously after research
 - **Comprehensive Logging**: All agent interactions logged to console and database
 
 ## 📋 Requirements
 
 - Python 3.9+
-- OpenRouter API key
-- Internet connection for web research
+- OpenRouter API key (for AI model access)
+- Internet connection for research
 
 ## 🛠️ Installation
 
@@ -52,17 +52,24 @@ Edit the `.env` file with your configuration:
 # Required
 OPENROUTER_API_KEY=your_openrouter_api_key_here
 
-# Optional - customize models
-MASTER_MODEL=openai/gpt-5
-RESEARCH_MODEL=anthropic/claude-3-opus
-KEYWORD_MODEL=google/gemini-2.5-flash
-POST_MODEL=openai/gpt-4
-DIALOG_MODEL=anthropic/claude-3-sonnet
+# Optional - customize models (defaults shown)
+MASTER_MODEL=sonar  # Perplexity AI research model
+KEYWORD_MODEL=google/gemini-2.0-flash-001
+POST_MODEL=xai/grok-3-mini
+DIALOG_MODEL=xai/grok-3-mini
+
+# Optional - system settings
+LOG_LEVEL=INFO
+DATABASE_URL=sqlite+aiosqlite:///./agentic_system.db
+MAX_RETRIES=3
+TIMEOUT_SECONDS=120
 ```
 
 ## 🎯 Usage
 
 ### Basic Usage
+
+Run the system with a simple topic:
 
 ```bash
 python main.py "Artificial Intelligence in Healthcare"
@@ -90,13 +97,6 @@ python main.py "Blockchain Technology" --output-format json
 
 📋 Session ID: 1
 📝 Topic: Artificial Intelligence in Healthcare
-
-🔍 Topic Analysis:
-  • Themes: ['AI diagnostics', 'treatment optimization', 'patient care']
-  • Audience: healthcare professionals, tech enthusiasts
-  • Goals: ['inform about AI applications', 'discuss benefits and challenges']
-  • Research_directions: ['current implementations', 'case studies', 'regulatory landscape']
-  • Style: professional yet accessible
 
 🏷️ Keywords:
   • artificial intelligence
@@ -138,7 +138,7 @@ Let me walk you through what I'm seeing in the industry right now...
 ----------------------------------------
 
 📚 Research Summary:
-Comprehensive research gathered from 15+ sources including recent studies, industry reports, and expert analyses covering AI applications in diagnostics, treatment optimization, drug discovery, and telemedicine.
+Comprehensive research gathered from Perplexity AI covering current developments, key insights, trends, and relevant data points in AI healthcare applications.
 
 ============================================================
 ✅ Processing Complete!
@@ -147,43 +147,52 @@ Comprehensive research gathered from 15+ sources including recent studies, indus
 
 ## 🏗️ System Architecture
 
-The system follows a hierarchical agent architecture:
+The system follows a streamlined agent architecture:
 
-1. **Master Agent** (GPT-5)
-   - Analyzes input topics
+1. **Research Phase** (Sequential)
+   - Perplexity AI (sonar model) performs comprehensive research on the topic
+   - Provides detailed analysis, current facts, trends, and insights
+
+2. **Master Agent** (Coordinator)
+   - Receives research from Perplexity
    - Orchestrates sub-agent execution
-   - Manages parallel processing
+   - Manages parallel processing of content generation
+   - Handles session management and logging
 
-2. **Web Researcher** (Claude-3 Opus)
-   - Performs comprehensive web research
-   - Uses tool-calling for web scraping and search
-   - Validates source credibility
+3. **Content Generation** (Parallel)
+   - **Keyword Generator** (Gemini 2.0 Flash): Creates SEO keywords and hashtags
+   - **Post Generator** (Grok-3): Generates LinkedIn posts
+   - **Voice Dialog Generator** (Grok-3): Creates podcast scripts
 
-3. **Keyword Generator** (Gemini 2.5 Flash)
-   - Generates SEO-optimized keywords
-   - Creates relevant hashtags
-   - Analyzes content trends
+4. **Output & Storage**
+   - Results displayed in formatted output
+   - All interactions logged to SQLite database
+   - Session tracking for resumability
 
-4. **Post Generator** (GPT-4)
-   - Creates engaging LinkedIn content
-   - Maintains casual, professional tone
-   - Incorporates research insights
-
-5. **Voice Dialog Generator** (Claude-3 Sonnet)
-   - Converts posts to conversational scripts
-   - Adds natural speech patterns
-   - Includes pacing and emphasis cues
+### Data Flow Diagram
+```
+User Input (Topic)
+    ↓
+Perplexity AI Research (Sequential)
+    ↓
+Master Agent Coordination
+    ↓
+Parallel Content Generation:
+├── Keyword Generation (Gemini)
+├── Post Generation (Grok-3)
+└── Voice Script Generation (Grok-3)
+    ↓
+Formatted Output + Database Logging
+```
 
 ## 📊 Database Schema
 
 The system uses SQLite for persistent storage:
 
-- **Sessions**: Complete workflow instances
-- **Agent Logs**: All agent actions and executions
-- **Research Results**: Web research findings
-- **Keywords**: Generated keywords and hashtags
-- **Generated Content**: Posts and voice scripts
-- **Agent Handoffs**: Inter-agent communications
+- **Sessions**: Complete workflow instances with status tracking
+- **Agent Logs**: All agent actions, inputs, outputs, and timing
+- **Keywords**: Generated keywords and hashtags with relevance scores
+- **Generated Content**: Posts and voice scripts with metadata
 
 ## 🔧 Development
 
@@ -209,7 +218,7 @@ mypy .
 ### Adding New Agents
 
 1. Create agent class inheriting from `BaseAgent`
-2. Implement `execute()` method
+2. Implement the `execute()` method
 3. Add to `agents/sub_agents/` directory
 4. Update `MasterAgent.initialize_sub_agents()`
 5. Add configuration in `config/settings.py`
@@ -232,7 +241,7 @@ from config.settings import config
 
 # Access configuration
 api_key = config.openrouter_api_key
-model_config = config.get_model_config("master")
+model_config = config.get_model_config("keyword")
 ```
 
 ## 🤝 Contributing
@@ -263,9 +272,13 @@ This system generates content using AI models. Always review and fact-check gene
    - Ensure write permissions in the project directory
    - Check SQLite installation
 
-3. **Web Research Failures**
+3. **Research Failures**
    - Check internet connection
-   - Some websites may block automated requests
+   - Verify OpenRouter API access
+
+4. **Agent Timeouts**
+   - Increase timeout settings in config
+   - Check API rate limits
 
 ### Debug Mode
 

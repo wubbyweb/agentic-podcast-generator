@@ -72,8 +72,8 @@ class TestSystemConfig:
         "LOG_LEVEL": "DEBUG",
         "MAX_RETRIES": "5",
         "TIMEOUT_SECONDS": "60",
-        "MASTER_MODEL": "openai/gpt-5",
-        "RESEARCH_MODEL": "anthropic/claude-3-opus"
+        "MASTER_MODEL": "perplexity/sonar",
+        "RESEARCH_MODEL": "perplexity/sonar"
     })
     def test_system_config_with_env_vars(self):
         """Test SystemConfig loading from environment variables."""
@@ -107,7 +107,7 @@ class TestSystemConfig:
 
         # Check master model configuration
         master_model = config.models["master"]
-        assert master_model.name == "openai/gpt-5"
+        assert master_model.name == "perplexity/sonar"
         assert master_model.max_tokens == 4000
         assert master_model.temperature == 0.7
 
@@ -132,7 +132,7 @@ class TestSystemConfig:
 
         model_config = config.get_model_config("master")
         assert isinstance(model_config, ModelConfig)
-        assert model_config.name == "openai/gpt-5"
+        assert model_config.name == "perplexity/sonar"
 
     def test_get_model_config_invalid_agent(self):
         """Test getting model config for invalid agent."""
