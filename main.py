@@ -19,6 +19,7 @@ from agents.master_agent import MasterAgent
 from config.settings import config
 from database.connection import init_database
 from services.logger import setup_logging
+from services.openrouter_client import OpenRouterClient
 
 @click.command()
 @click.argument('topic', required=True)
@@ -37,6 +38,30 @@ def main(
     TOPIC: The topic to process through the agent system
     """
     asyncio.run(async_main(topic, verbose, session_id, output_format))
+
+
+async def get_perplexity_research(topic: str) -> str:
+    """Get comprehensive research from Perplexity API using sonar model."""
+    async with OpenRouterClient(config.openrouter_api_key) as client:
+        messages = [
+            {
+                "role": "system",
+                "content": "You are an expert research assistant. Provide comprehensive, up-to-date research and analysis on the given topic. Include current facts, key insights, trends, and relevant data points."
+            },
+            {
+                "role": "user",
+                "content": f"Research and analyze this topic comprehensively: {topic}. Provide detailed findings, current developments, and key insights."
+            }
+        ]
+
+        response = await client.chat_completion(
+            model="sonar",
+            messages=messages,
+            max_tokens=4000,
+            temperature=0.3
+        )
+
+        return client.extract_response_content(response)
 
 
 async def async_main(
@@ -60,14 +85,19 @@ async def async_main(
         await init_database()
         logger.info("Database initialized")
 
-        # Create and run Master Agent
+        # Step 1: Get research from Perplexity API
+        logger.info(f"Getting research for topic: {topic}")
+        research_response = await get_perplexity_research(topic)
+        logger.info("Research completed from Perplexity")
+
+        # Create and run Master Agent with research response
         async with MasterAgent() as master:
             logger.info(f"Processing topic: {topic}")
 
             if session_id:
                 logger.info(f"Resuming session: {session_id}")
 
-            result = await master.process_topic(topic, session_id=session_id)
+            result = await master.process_topic_with_research(topic, research_response, session_id=session_id)
 
             # Output results
             if output_format == 'json':

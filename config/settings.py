@@ -53,27 +53,27 @@ class SystemConfig:
         """Configure OpenRouter models"""
         self.models = {
             "master": ModelConfig(
-                name=os.getenv("MASTER_MODEL", "openai/gpt-5"),
+                name=os.getenv("MASTER_MODEL", "sonar"),  # Perplexity sonar for research
                 max_tokens=4000,
                 temperature=0.7
             ),
             "research": ModelConfig(
-                name=os.getenv("RESEARCH_MODEL", "anthropic/claude-3-opus"),
+                name=os.getenv("RESEARCH_MODEL", "sonar"),  # Perplexity sonar for research
                 max_tokens=8000,
                 temperature=0.3
             ),
             "keyword": ModelConfig(
-                name=os.getenv("KEYWORD_MODEL", "google/gemini-2.5-flash"),
+                name=os.getenv("KEYWORD_MODEL", "google/gemini-2.0-flash-001"),
                 max_tokens=2000,
                 temperature=0.5
             ),
             "post": ModelConfig(
-                name=os.getenv("POST_MODEL", "openai/gpt-4"),
+                name=os.getenv("POST_MODEL", "xai/grok-3-mini"),
                 max_tokens=1000,
                 temperature=0.8
             ),
             "dialog": ModelConfig(
-                name=os.getenv("DIALOG_MODEL", "anthropic/claude-3-sonnet"),
+                name=os.getenv("DIALOG_MODEL", "xai/grok-3-mini"),
                 max_tokens=3000,
                 temperature=0.9
             )

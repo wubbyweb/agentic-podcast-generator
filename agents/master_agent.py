@@ -11,6 +11,8 @@ from .sub_agents.keyword_generator import KeywordGenerator
 from .sub_agents.post_generator import PostGenerator
 from .sub_agents.voice_dialog import VoiceDialogGenerator
 from database.connection import create_session_record, update_session_status
+from services.openrouter_client import OpenRouterClient
+from config.settings import config
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +24,17 @@ class MasterAgent(BaseAgent):
         self.sub_agents = {}
 
     async def process_topic(self, topic: str, session_id: Optional[int] = None) -> Dict[str, Any]:
-        """Main workflow orchestration.
+        """Legacy method for backward compatibility."""
+        # Get research from Perplexity first
+        research_response = await self.get_perplexity_research(topic)
+        return await self.process_topic_with_research(topic, research_response, session_id)
+
+    async def process_topic_with_research(self, topic: str, research_response: str, session_id: Optional[int] = None) -> Dict[str, Any]:
+        """Main workflow orchestration using provided research response.
 
         Args:
             topic: The topic to process
+            research_response: Research response from Perplexity API
             session_id: Optional existing session ID to resume
 
         Returns:
@@ -41,50 +50,78 @@ class MasterAgent(BaseAgent):
                 self.session_id = session_id
                 logger.info(f"Resuming session {self.session_id}")
 
-            # Step 1: Analyze topic with GPT-5
-            analysis = await self.analyze_topic(topic)
+            # Step 1: Initialize all sub-agents (post, voice, keyword)
+            await self.initialize_all_agents()
 
-            # Step 2: Initialize sub-agents
-            await self.initialize_sub_agents()
-
-            # Step 3: Execute parallel tasks (Web Research + Keyword Generation)
-            research_task = self.sub_agents['web_researcher'].execute_with_logging({
+            # Step 2: Prepare research data from Perplexity response
+            research_results = {
                 "topic": topic,
-                "analysis": analysis
-            })
-            keyword_task = self.sub_agents['keyword_generator'].execute_with_logging({
-                "topic": topic,
-                "analysis": analysis
-            })
+                "research_plan": {"search_queries": [topic], "source_types": ["perplexity"]},
+                "results": [{
+                    "title": f"Perplexity Research: {topic}",
+                    "url": f"https://perplexity.ai/search?q={topic.replace(' ', '+')}",
+                    "snippet": research_response[:500],
+                    "content": research_response,
+                    "source": "perplexity",
+                    "relevance_score": 1.0,
+                    "credibility_score": 0.9
+                }],
+                "summary": research_response,
+                "total_sources": 1,
+                "credibility_score": 0.9
+            }
 
-            # Run parallel tasks
-            research_results, keywords = await asyncio.gather(research_task, keyword_task)
+            # Step 3: Run sub-agents in parallel
+            logger.info("Running sub-agents in parallel")
 
-            # Step 4: Generate LinkedIn post
-            post_result = await self.sub_agents['post_generator'].execute_with_logging({
+            # Prepare inputs for each sub-agent
+            post_input = {
                 "topic": topic,
                 "research": research_results,
-                "keywords": keywords
-            })
+                "research_response": research_response
+            }
 
-            # Step 5: Generate voice dialog
-            voice_result = await self.sub_agents['voice_dialog'].execute_with_logging({
-                "linkedin_post": post_result["content"]
-            })
+            voice_input = {
+                "topic": topic,
+                "research_response": research_response
+            }
 
-            # Step 6: Update session status
+            keyword_input = {
+                "topic": topic,
+                "research_response": research_response
+            }
+
+            # Execute all sub-agents concurrently
+            post_task = self.sub_agents['post_generator'].execute_with_logging(post_input)
+            voice_task = self.sub_agents['voice_dialog'].execute_with_logging(voice_input)
+            keyword_task = self.sub_agents['keyword_generator'].execute_with_logging(keyword_input)
+
+            post_result, voice_result, keyword_result = await asyncio.gather(
+                post_task, voice_task, keyword_task, return_exceptions=True
+            )
+
+            # Handle any exceptions from parallel execution
+            results = {}
+            for name, result in [("post", post_result), ("voice", voice_result), ("keyword", keyword_result)]:
+                if isinstance(result, Exception):
+                    logger.error(f"Sub-agent {name} failed: {result}")
+                    results[name] = None
+                else:
+                    results[name] = result
+
+            # Step 4: Update session status
             await update_session_status(self.session_id, "completed")
 
-            # Step 7: Return final results
+            # Step 5: Return final results
             return {
                 "session_id": self.session_id,
                 "topic": topic,
-                "analysis": analysis,
-                "linkedin_post": post_result["content"],
-                "voice_dialog": voice_result["dialog"],
-                "keywords": keywords.get("keywords", []),
-                "hashtags": keywords.get("hashtags", []),
-                "research_summary": research_results.get("summary", "")
+                "research_response": research_response,
+                "linkedin_post": results.get("post", {}).get("content", "") if results.get("post") else "",
+                "voice_dialog": results.get("voice", {}).get("dialog", "") if results.get("voice") else "",
+                "keywords": results.get("keyword", {}).get("keywords", []) if results.get("keyword") else [],
+                "hashtags": results.get("keyword", {}).get("hashtags", []) if results.get("keyword") else [],
+                "research_summary": research_response[:500]
             }
 
         except Exception as e:
@@ -93,55 +130,52 @@ class MasterAgent(BaseAgent):
                 await update_session_status(self.session_id, "failed", str(e))
             raise
 
+    async def get_perplexity_research(self, topic: str) -> str:
+        """Get comprehensive research from Perplexity API using sonar model."""
+        async with OpenRouterClient(config.openrouter_api_key) as client:
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are an expert research assistant. Provide comprehensive, up-to-date research and analysis on the given topic. Include current facts, key insights, trends, and relevant data points."
+                },
+                {
+                    "role": "user",
+                    "content": f"Research and analyze this topic comprehensively: {topic}. Provide detailed findings, current developments, and key insights."
+                }
+            ]
+
+            response = await client.chat_completion(
+                model="sonar",
+                messages=messages,
+                max_tokens=4000,
+                temperature=0.3
+            )
+
+            return client.extract_response_content(response)
+
     async def analyze_topic(self, topic: str) -> Dict[str, Any]:
-        """Analyze topic using GPT-5 to understand requirements."""
+        """Legacy method for backward compatibility - now uses Perplexity research."""
+        research_response = await self.get_perplexity_research(topic)
 
-        system_prompt = """You are an expert content strategist. Analyze the given topic and provide:
-1. Key themes and angles to explore
-2. Target audience characteristics
-3. Content goals and objectives
-4. Research directions needed
-5. Content style recommendations
-
-Provide your analysis in JSON format with these keys: themes, audience, goals, research_directions, style."""
-
-        messages = [
-            self.create_system_message(system_prompt),
-            self.create_user_message(f"Analyze this topic for content creation: {topic}")
-        ]
-
-        response = await self.call_openrouter(messages)
-        content = self.openrouter.extract_response_content(response)
-
-        try:
-            analysis = json.loads(content)
-        except json.JSONDecodeError:
-            # Fallback if JSON parsing fails
-            analysis = {
-                "themes": [topic],
-                "audience": "general professional audience",
-                "goals": ["inform and engage"],
-                "research_directions": ["general information gathering"],
-                "style": "professional and conversational"
-            }
+        # Parse the research response into structured analysis
+        analysis = {
+            "themes": [topic],
+            "audience": "general professional audience",
+            "goals": ["inform and engage"],
+            "research_findings": research_response,
+            "keywords": [topic],
+            "hashtags": [f"#{topic.replace(' ', '')}"],
+            "style": "professional and conversational",
+            "summary": research_response[:500]
+        }
 
         # Log the analysis
         await self.log_action("topic_analysis", input_data={"topic": topic}, output_data=analysis)
 
         return analysis
 
-    async def initialize_sub_agents(self) -> None:
-        """Initialize all sub-agents with proper context."""
-
-        # Initialize Web Researcher
-        self.sub_agents['web_researcher'] = WebResearcher()
-        self.sub_agents['web_researcher'].session_id = self.session_id
-        await self.sub_agents['web_researcher'].__aenter__()
-
-        # Initialize Keyword Generator
-        self.sub_agents['keyword_generator'] = KeywordGenerator()
-        self.sub_agents['keyword_generator'].session_id = self.session_id
-        await self.sub_agents['keyword_generator'].__aenter__()
+    async def initialize_all_agents(self) -> None:
+        """Initialize all sub-agents for parallel execution."""
 
         # Initialize Post Generator
         self.sub_agents['post_generator'] = PostGenerator()
@@ -152,6 +186,11 @@ Provide your analysis in JSON format with these keys: themes, audience, goals, r
         self.sub_agents['voice_dialog'] = VoiceDialogGenerator()
         self.sub_agents['voice_dialog'].session_id = self.session_id
         await self.sub_agents['voice_dialog'].__aenter__()
+
+        # Initialize Keyword Generator
+        self.sub_agents['keyword_generator'] = KeywordGenerator()
+        self.sub_agents['keyword_generator'].session_id = self.session_id
+        await self.sub_agents['keyword_generator'].__aenter__()
 
         logger.info("All sub-agents initialized")
 

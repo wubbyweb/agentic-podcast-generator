@@ -18,14 +18,15 @@ class VoiceDialogGenerator(BaseAgent):
         super().__init__("voice_dialog", "dialog")
 
     async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate a voice dialog script from LinkedIn post content."""
+        """Generate a voice dialog script from research response."""
 
-        self.validate_input(input_data, ["linkedin_post"])
+        self.validate_input(input_data, ["topic", "research_response"])
 
-        linkedin_post = input_data["linkedin_post"]
+        topic = input_data["topic"]
+        research_response = input_data["research_response"]
 
         # Generate voice dialog
-        voice_dialog = await self._generate_voice_dialog(linkedin_post)
+        voice_dialog = await self._generate_voice_dialog(topic, research_response)
 
         # Analyze dialog quality
         quality_metrics = await self._analyze_dialog_quality(voice_dialog)
@@ -47,19 +48,19 @@ class VoiceDialogGenerator(BaseAgent):
             "segments": self._extract_dialog_segments(enhanced_dialog)
         }
 
-    async def _generate_voice_dialog(self, linkedin_post: str) -> str:
+    async def _generate_voice_dialog(self, topic: str, research_response: str) -> str:
         """Generate a conversational voice dialog from LinkedIn post content."""
 
-        system_prompt = """You are a professional voice content creator and scriptwriter. Transform the LinkedIn post into a natural, conversational voice dialog that:
+        system_prompt = """You are a professional voice content creator and scriptwriter. Transform the research into a natural, conversational podcast script that:
 
 1. Sounds like a professional speaking naturally to an audience
-2. Maintains the key insights and value from the original post
+2. Maintains the key insights and value from the research
 3. Uses conversational language with contractions and personal touches
 4. Includes natural pauses and emphasis indicators
 5. Adds transitional phrases for smooth flow
 6. Incorporates rhetorical questions and engagement elements
 7. Uses vocal variety indicators (enthusiasm, emphasis, pauses)
-8. Keeps the professional yet approachable tone
+8. Maintains the professional yet approachable tone
 9. Includes calls-to-action that work well in audio format
 10. Structures content for 2-3 minute delivery
 
@@ -71,12 +72,12 @@ Format the script with:
 - (Pause) for natural breaks
 - Clear paragraph breaks for breathing room"""
 
-        user_content = f"""Transform this LinkedIn post into a natural voice dialog script:
+        user_content = f"""Topic: {topic}
 
-Original Post:
-{linkedin_post}
+Research from Perplexity AI:
+{research_response}
 
-Create a conversational script that maintains the professional insights while sounding natural when spoken aloud. Include timing for a 2-3 minute delivery."""
+Create a conversational podcast script that leverages this research. The script should sound natural when spoken aloud and be suitable for a 2-3 minute delivery."""
 
         messages = [
             self.create_system_message(system_prompt),

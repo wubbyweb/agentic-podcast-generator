@@ -1,11 +1,11 @@
 ``` mermaid
 graph TD
-    MasterAgent --> WebResearcher;
-    MasterAgent --> KeywordGenerator;
-    WebResearcher --> MasterAgent;
-    KeywordGenerator --> MasterAgent;
-    MasterAgent --> PostGenerator;
-    PostGenerator --> MasterAgent;
-    MasterAgent --> VoiceDialogGenerator;
-    VoiceDialogGenerator --> MasterAgent;
+    A[Perplexity Research] --> B[MasterAgent]
+    B --> C{Parallel Execution}
+    C --> D[PostGenerator]
+    C --> E[VoiceDialogGenerator]
+    C --> F[KeywordGenerator]
+    D --> G[Collect Results]
+    E --> G
+    F --> G
 ```
