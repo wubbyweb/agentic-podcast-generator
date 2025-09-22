@@ -17,16 +17,15 @@ class PostGenerator(BaseAgent):
         super().__init__("post_generator", "post")
 
     async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate a LinkedIn post based on research and keywords."""
+        """Generate a LinkedIn post based on research response."""
 
-        self.validate_input(input_data, ["topic", "research", "keywords"])
+        self.validate_input(input_data, ["topic", "research_response"])
 
         topic = input_data["topic"]
-        research = input_data["research"]
-        keywords = input_data["keywords"]
+        research_response = input_data["research_response"]
 
         # Generate LinkedIn post
-        post_content = await self._generate_linkedin_post(topic, research, keywords)
+        post_content = await self._generate_linkedin_post(topic, research_response)
 
         # Analyze post quality
         quality_metrics = await self._analyze_post_quality(post_content, topic)
@@ -48,10 +47,9 @@ class PostGenerator(BaseAgent):
     async def _generate_linkedin_post(
         self,
         topic: str,
-        research: Dict[str, Any],
-        keywords: Dict[str, Any]
+        research_response: str
     ) -> str:
-        """Generate an engaging LinkedIn post using research and keywords."""
+        """Generate an engaging LinkedIn post using Perplexity research response."""
 
         system_prompt = """You are a professional content creator specializing in LinkedIn posts. Create engaging, professional content that:
 
@@ -61,10 +59,9 @@ class PostGenerator(BaseAgent):
 4. Includes relevant hashtags naturally
 5. Ends with a question or call-to-action
 6. Stays between 150-250 words
-7. Incorporates 3-5 relevant keywords naturally
-8. Uses emojis sparingly and appropriately
-9. Maintains professional yet approachable tone
-10. Includes specific examples or data points from research
+7. Uses emojis sparingly and appropriately
+8. Maintains professional yet approachable tone
+9. Includes specific examples or data points from research
 
 Structure the post with:
 - Attention-grabbing opening
@@ -73,29 +70,12 @@ Structure the post with:
 - Call-to-action question
 - Relevant hashtags"""
 
-        # Extract key information from research
-        research_summary = research.get("summary", "")
-        key_findings = research.get("results", [])
-
-        # Extract keywords and hashtags
-        keyword_list = keywords.get("keywords", [])[:8]  # Top 8 keywords
-        hashtag_list = keywords.get("hashtags", [])[:5]  # Top 5 hashtags
-
-        # Build research context
-        research_context = f"""
-Research Summary: {research_summary}
-
-Key Findings:
-{self._format_key_findings(key_findings)}
-
-Available Keywords: {', '.join(keyword_list)}
-Available Hashtags: {', '.join(hashtag_list)}"""
-
         user_content = f"""Topic: {topic}
 
-{research_context}
+Research from Perplexity AI:
+{research_response}
 
-Create an engaging LinkedIn post that leverages this research and incorporates relevant keywords naturally. The post should drive professional discussion and engagement."""
+Create an engaging LinkedIn post that leverages this research. The post should drive professional discussion and engagement."""
 
         messages = [
             self.create_system_message(system_prompt),

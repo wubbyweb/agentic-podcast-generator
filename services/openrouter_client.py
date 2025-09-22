@@ -50,10 +50,10 @@ class OpenRouterClient:
         max_tokens: Optional[int] = None,
         top_p: Optional[float] = None
     ) -> Dict[str, Any]:
-        """Send chat completion request to OpenRouter.
+        """Send chat completion request to OpenRouter or direct Perplexity API.
 
         Args:
-            model: Model name (e.g., 'openai/gpt-4')
+            model: Model name (e.g., 'openai/gpt-4' or 'sonar' for Perplexity)
             messages: List of message dictionaries
             tools: Optional list of tool definitions
             temperature: Sampling temperature
@@ -67,7 +67,15 @@ class OpenRouterClient:
         if not self.session:
             raise RuntimeError("Client session not initialized. Use async context manager.")
 
-        # Build request payload
+        start_time = datetime.utcnow()
+
+        # Check if using Perplexity direct API
+        if model == "sonar":
+            return await self._chat_completion_perplexity(
+                messages, temperature, max_tokens
+            )
+
+        # Build request payload for OpenRouter
         payload = {
             "model": model,
             "messages": messages
@@ -87,8 +95,6 @@ class OpenRouterClient:
             payload["tool_choice"] = "auto"
 
         logger.debug(f"Sending request to {model} with {len(messages)} messages")
-
-        start_time = datetime.utcnow()
 
         try:
             async with self.session.post(
@@ -110,6 +116,57 @@ class OpenRouterClient:
             duration = (datetime.utcnow() - start_time).total_seconds() * 1000
             logger.error(
                 f"OpenRouter API call failed after {duration:.2f}ms: {e}"
+            )
+            raise
+
+    async def _chat_completion_perplexity(
+        self,
+        messages: List[Dict[str, Any]],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Send chat completion request directly to Perplexity API."""
+
+        if not config.perplexity_api_key:
+            raise RuntimeError("Perplexity API key not configured")
+
+        url = "https://api.perplexity.ai/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {config.perplexity_api_key}",
+            "Content-Type": "application/json"
+        }
+
+        payload = {
+            "model": "sonar",
+            "messages": messages
+        }
+
+        if temperature is not None:
+            payload["temperature"] = temperature
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
+
+        logger.debug(f"Sending request to Perplexity API with {len(messages)} messages")
+
+        start_time = datetime.utcnow()
+
+        try:
+            async with self.session.post(url, json=payload, headers=headers) as response:
+                response.raise_for_status()
+                result = await response.json()
+
+                duration = (datetime.utcnow() - start_time).total_seconds() * 1000
+                logger.info(
+                    f"Perplexity API call completed in {duration:.2f}ms "
+                    f"(model: sonar, tokens: {result.get('usage', {}).get('total_tokens', 'N/A')})"
+                )
+
+                return result
+
+        except aiohttp.ClientError as e:
+            duration = (datetime.utcnow() - start_time).total_seconds() * 1000
+            logger.error(
+                f"Perplexity API call failed after {duration:.2f}ms: {e}"
             )
             raise
 

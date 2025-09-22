@@ -18,15 +18,15 @@ class KeywordGenerator(BaseAgent):
         super().__init__("keyword_generator", "keyword")
 
     async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate keywords and hashtags for the given topic."""
+        """Generate keywords and hashtags for the given topic using research response."""
 
-        self.validate_input(input_data, ["topic"])
+        self.validate_input(input_data, ["topic", "research_response"])
 
         topic = input_data["topic"]
-        analysis = input_data.get("analysis", {})
+        research_response = input_data["research_response"]
 
-        # Generate keywords using Gemini 2.5 Flash
-        keyword_data = await self._generate_keywords(topic, analysis)
+        # Generate keywords using Gemini 2.0 Flash
+        keyword_data = await self._generate_keywords(topic, research_response)
 
         # Extract and categorize keywords
         keywords = keyword_data.get("keywords", [])
@@ -52,8 +52,8 @@ class KeywordGenerator(BaseAgent):
             "categories": keyword_data.get("categories", [])
         }
 
-    async def _generate_keywords(self, topic: str, analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate comprehensive keywords and hashtags using Gemini 2.5 Flash."""
+    async def _generate_keywords(self, topic: str, research_response: str) -> Dict[str, Any]:
+        """Generate comprehensive keywords and hashtags using Gemini 2.0 Flash."""
 
         system_prompt = """You are an expert SEO strategist and content marketer specializing in keyword research and social media optimization.
 
@@ -74,24 +74,15 @@ Categorize keywords by:
 
 Return results in JSON format with these keys: keywords, hashtags, categories, search_intent_breakdown."""
 
-        # Build context from topic analysis
-        context_info = ""
-        if analysis:
-            themes = analysis.get("themes", [])
-            audience = analysis.get("audience", "")
-            context_info = f"""
-Topic Analysis Context:
-- Key Themes: {', '.join(themes) if isinstance(themes, list) else themes}
-- Target Audience: {audience}
-- Content Goals: {analysis.get('goals', '')}
-- Style Requirements: {analysis.get('style', '')}"""
+        user_content = f"""Topic: {topic}
 
-        user_content = f"""Topic: {topic}{context_info}
+Research Context from Perplexity AI:
+{research_response}
 
-Generate comprehensive keyword and hashtag suggestions for content creation, social media posts, and SEO optimization.
+Generate comprehensive keyword and hashtag suggestions for content creation, social media posts, and SEO optimization based on this research.
 
 Focus on:
-- Current trends and emerging topics
+- Current trends and emerging topics from the research
 - Professional and industry-specific terminology
 - Social media friendly hashtags
 - Search engine optimization potential
