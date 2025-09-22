@@ -9,6 +9,7 @@ from ..base_agent import BaseAgent
 from database.connection import get_db_session
 from database.models import ResearchResult
 from services.search_api import SearchAPI
+from services.web_scraper import WebScraper
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +127,9 @@ class WebResearcher(BaseAgent):
         # Analyze and summarize findings
         summary = await self._analyze_findings(topic, research_results)
 
+        # Log summary for debugging
+        logger.info(f"Research summary for '{topic}': {summary[:200]}...")
+
         # Store results in database
         await self._store_research_results(research_results)
 
@@ -204,6 +208,27 @@ Create a comprehensive research plan that will gather high-quality, relevant inf
 
         # Use the SearchAPI to search multiple sources and combine results
         search_results = await self.search_api.search_and_combine(query, num_results=10)
+
+        # Log search results for debugging
+        logger.info(f"Search results for '{query}': {len(search_results)} results")
+        for i, result in enumerate(search_results[:3], 1):  # Log first 3 results
+            logger.info(f"Result {i}: {result.get('title', 'N/A')} - {result.get('url', 'N/A')}")
+
+        # Scrape top URLs for full content (skip Perplexity results as they already have full content)
+        urls_to_scrape = [result['url'] for result in search_results[:3] if result.get('url') and result.get('source') != 'perplexity']
+        if urls_to_scrape:
+            async with WebScraper() as scraper:
+                scraped_contents = await scraper.scrape_multiple_urls(urls_to_scrape, extract_type="text")
+                # Update search results with scraped content
+                for i, scraped in enumerate(scraped_contents):
+                    if scraped.get('success') and i < len(urls_to_scrape):
+                        # Find the corresponding result
+                        for result in search_results:
+                            if result.get('url') == urls_to_scrape[i]:
+                                result['content'] = scraped.get('content', result.get('snippet', ''))
+                                result['scraped_title'] = scraped.get('title', '')
+                                logger.info(f"Scraped content for {urls_to_scrape[i]}: {len(scraped.get('content', ''))} chars")
+                                break
 
         # Ensure each result has a 'content' field (fallback to snippet)
         for result in search_results:

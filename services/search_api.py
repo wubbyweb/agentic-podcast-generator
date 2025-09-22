@@ -16,6 +16,7 @@ class SearchAPI:
         self.google_api_key = config.google_api_key
         self.google_cse_id = config.google_cse_id
         self.bing_api_key = config.bing_api_key
+        self.perplexity_api_key = config.perplexity_api_key
 
         # Skip placeholder values
         if self.google_api_key and self.google_api_key.startswith("your_"):
@@ -24,6 +25,8 @@ class SearchAPI:
             self.google_cse_id = None
         if self.bing_api_key and self.bing_api_key.startswith("your_"):
             self.bing_api_key = None
+        if self.perplexity_api_key and self.perplexity_api_key.startswith("your_"):
+            self.perplexity_api_key = None
 
     async def search_google(self, query: str, num_results: int = 10, **kwargs) -> List[Dict[str, Any]]:
         """Search using Google Custom Search API."""
@@ -179,6 +182,62 @@ class SearchAPI:
 
         return results
 
+    async def search_perplexity(self, query: str, num_results: int = 10, **kwargs) -> List[Dict[str, Any]]:
+        """Search using Perplexity AI."""
+        if not self.perplexity_api_key:
+            logger.warning("Perplexity API key not configured")
+            return []
+
+        try:
+            import aiohttp
+
+            url = "https://api.perplexity.ai/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {self.perplexity_api_key}",
+                "Content-Type": "application/json"
+            }
+
+            # Use the correct Perplexity model for online search
+            payload = {
+                "model": "sonar",  # Perplexity online search model
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": f"Search for recent information about: {query}. Provide {num_results} relevant results with titles, URLs, and brief summaries. Format as numbered list."
+                    }
+                ],
+                "max_tokens": 1500,
+                "temperature": 0.1
+            }
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload, headers=headers) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+
+                    content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+                    # For Perplexity, return the response as a single comprehensive result
+                    if content:
+                        return [{
+                            "title": f"Perplexity Search: {query}",
+                            "url": f"https://perplexity.ai/search?q={query.replace(' ', '+')}",
+                            "snippet": content[:500] + "..." if len(content) > 500 else content,
+                            "content": content,
+                            "source": "perplexity",
+                            "query": query
+                        }]
+                    else:
+                        return []
+
+        except ImportError:
+            logger.warning("aiohttp not available for Perplexity search")
+            return []
+        except Exception as e:
+            logger.error(f"Perplexity search error: {e}")
+            return []
+
+
     async def search_multiple_sources(
         self,
         query: str,
@@ -188,11 +247,14 @@ class SearchAPI:
     ) -> Dict[str, List[Dict[str, Any]]]:
         """Search multiple sources concurrently."""
         if sources is None:
-            sources = ["google", "bing", "duckduckgo"]
+            sources = ["perplexity", "google", "bing", "duckduckgo"]
 
         # Create search tasks
         tasks = []
         results = {}
+
+        if "perplexity" in sources and self.perplexity_api_key:
+            tasks.append(("perplexity", self.search_perplexity(query, num_results, **kwargs)))
 
         if "google" in sources and self.google_api_key and self.google_cse_id:
             tasks.append(("google", self.search_google(query, num_results, **kwargs)))
@@ -261,6 +323,7 @@ class SearchAPI:
     def validate_api_keys(self) -> Dict[str, bool]:
         """Validate that API keys are configured."""
         return {
+            "perplexity": bool(self.perplexity_api_key),
             "google": bool(self.google_api_key and self.google_cse_id),
             "bing": bool(self.bing_api_key),
             "duckduckgo": True  # No API key required
@@ -269,6 +332,9 @@ class SearchAPI:
     def get_available_sources(self) -> List[str]:
         """Get list of available search sources."""
         available = ["duckduckgo"]  # Always available
+
+        if self.perplexity_api_key:
+            available.append("perplexity")
 
         if self.google_api_key and self.google_cse_id:
             available.append("google")

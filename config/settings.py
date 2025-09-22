@@ -42,6 +42,7 @@ class SystemConfig:
         self.google_api_key = os.getenv("GOOGLE_API_KEY")
         self.google_cse_id = os.getenv("GOOGLE_CSE_ID")
         self.bing_api_key = os.getenv("BING_API_KEY")
+        self.perplexity_api_key = os.getenv("PERPLEXITY_API_KEY")
 
         # Web scraping config
         self.user_agent = os.getenv("USER_AGENT", "AgenticSystem/1.0.0")
