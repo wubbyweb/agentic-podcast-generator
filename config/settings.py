@@ -67,12 +67,12 @@ class SystemConfig:
                 temperature=0.5
             ),
             "post": ModelConfig(
-                name=os.getenv("POST_MODEL", "xai/grok-3-mini"),  # Actual model used
+                name=os.getenv("POST_MODEL", "x-ai/grok-3-mini"),  # Actual model used
                 max_tokens=1000,
                 temperature=0.8  # Higher temperature for creative content
             ),
             "dialog": ModelConfig(
-                name=os.getenv("DIALOG_MODEL", "xai/grok-3-mini"),  # Actual model used
+                name=os.getenv("DIALOG_MODEL", "x-ai/grok-3-mini"),  # Actual model used
                 max_tokens=3000,
                 temperature=0.9  # Higher temperature for conversational content
             )
